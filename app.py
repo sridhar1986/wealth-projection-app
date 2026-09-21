@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import io
 
-from engine import AccountConfig, ProjectionParameters, ProjectionEngine, STANDARD_BUCKETS
+from engine import AccountConfig, ProjectionParameters, ProjectionEngine, STANDARD_BUCKETS, SpendingPhase
 
 import hmac
 
@@ -216,6 +216,39 @@ with st.expander("📝 Edit Account Balances, Returns & Contributions", expanded
 
 st.session_state.accounts = updated_accounts
 
+# Cash Burn & Spending Phases Section
+with st.expander("🔥 Cash Burn & Spending Phases (Optional)", expanded=False):
+    st.write("Model life-stage spending (e.g., higher expenses during kids' school/college years, transitioning to lower post-school living expenses).")
+    enable_burn = st.checkbox("Enable Cash Burn / Spending Drawdowns", value=False, help="When enabled, annual living expenses and education draws are deducted from your portfolio.")
+    
+    spending_phases = []
+    inflate_spending = True
+    if enable_burn:
+        col_opt1, col_opt2 = st.columns(2)
+        with col_opt1:
+            inflate_spending = st.checkbox("Adjust expenses for annual inflation (%)", value=True, help="Increases annual spending with your expected inflation rate.")
+        
+        col_p1, col_p2 = st.columns(2)
+        with col_p1:
+            st.markdown("#### Phase 1: High Burn (Kids School / Family)")
+            default_p1_end = min(15, years)
+            p1_end = st.slider("Phase 1 Duration (Years)", min_value=1, max_value=max(1, years), value=default_p1_end, key="p1_dur",
+                               help="How many years Phase 1 lasts (e.g. until kids finish school/college).")
+            p1_burn = st.number_input("Phase 1 Total Annual Spending ($)", min_value=0.0, value=120000.0, step=5000.0, format="%.0f", key="p1_burn")
+            p1_529 = st.number_input("Portion Drawn from 529 for Education ($)", min_value=0.0, value=15000.0, step=2500.0, format="%.0f", key="p1_529",
+                                     help="Amount drawn specifically from the 529 bucket for tuition.")
+            spending_phases.append(SpendingPhase(name="Phase 1 (School/Family)", start_year=1, end_year=p1_end, annual_burn=p1_burn, education_from_529=p1_529))
+
+        with col_p2:
+            st.markdown("#### Phase 2: Post-School / Retirement")
+            p2_start = p1_end + 1
+            if p2_start <= years:
+                st.info(f"Phase 2 covers Years **{p2_start} to {years}**.")
+                p2_burn = st.number_input("Phase 2 Annual Spending ($)", min_value=0.0, value=80000.0, step=5000.0, format="%.0f", key="p2_burn")
+                spending_phases.append(SpendingPhase(name="Phase 2 (Post-School)", start_year=p2_start, end_year=years, annual_burn=p2_burn, education_from_529=0.0))
+            else:
+                st.info("Phase 1 spans the entire projection horizon.")
+
 # Run Projections
 params = ProjectionParameters(
     years=years,
@@ -223,6 +256,9 @@ params = ProjectionParameters(
     contribution_growth_rate_pct=contribution_growth,
     pre_tax_retirement_tax_rate_pct=pre_tax_rate,
     capital_gains_tax_rate_pct=cap_gains_rate,
+    enable_cash_burn=enable_burn,
+    inflate_spending=inflate_spending,
+    spending_phases=spending_phases,
 )
 
 df_proj = ProjectionEngine.run_projection(st.session_state.accounts, params)
@@ -236,8 +272,15 @@ total_end_nominal = end_year_row["total_nominal_balance"]
 total_end_real = end_year_row["total_real_balance"]
 total_contributions = end_year_row["total_contributions"]
 total_growth = end_year_row["total_growth"]
+total_burned = end_year_row["cumulative_burn"]
 
 display_total_end = total_end_real if view_real else total_end_nominal
+
+# Depletion alert if applicable
+depleted_years = df_proj[df_proj["total_nominal_balance"] <= 0]
+if not depleted_years.empty:
+    first_depleted_year = int(depleted_years.iloc[0]["year"])
+    st.error(f"⚠️ **Warning**: Under this spending rate, your portfolio is projected to be fully depleted in **Year {first_depleted_year}**.")
 
 # Tax-adjusted calculation
 ending_nominal_by_bucket = {acc.bucket: end_year_row[f"{acc.bucket}_nominal"] for acc in st.session_state.accounts}
@@ -253,10 +296,11 @@ kpi1, kpi2, kpi3, kpi4 = st.columns(4)
 value_prefix = "Real" if view_real else "Nominal"
 
 with kpi1:
+    gain_loss = display_total_end - total_start
     st.metric(
         label=f"Projected Wealth (Year {years}) [{value_prefix}]",
         value=f"${display_total_end:,.0f}",
-        delta=f"+${(display_total_end - total_start):,.0f} Total Gain",
+        delta=f"{'+' if gain_loss >= 0 else ''}${gain_loss:,.0f} Net Change",
     )
 
 with kpi2:
@@ -267,20 +311,29 @@ with kpi2:
     )
 
 with kpi3:
-    st.metric(
-        label=f"Total Compound Growth",
-        value=f"${total_growth:,.0f}",
-        delta=f"{((total_growth / total_start) * 100.0):.1f}% Portfolio Gain",
-    )
+    if enable_burn:
+        st.metric(
+            label=f"Total Lifetime Cash Burned",
+            value=f"${total_burned:,.0f}",
+            delta=f"Funded via Portfolio",
+            delta_color="inverse",
+        )
+    else:
+        st.metric(
+            label=f"Total Compound Growth",
+            value=f"${total_growth:,.0f}",
+            delta=f"{((total_growth / total_start) * 100.0):.1f}% Portfolio Gain",
+        )
 
 with kpi4:
-    tax_discount = display_total_end - total_net_usable_display
+    tax_discount = max(0.0, display_total_end - total_net_usable_display)
     st.metric(
         label=f"Est. Net Usable Wealth (After-Tax)",
         value=f"${total_net_usable_display:,.0f}",
         delta=f"-${tax_discount:,.0f} Est. Taxes",
         delta_color="off",
     )
+
 
 # Visualization Section
 tab_growth, tab_compare, tab_allocation, tab_table = st.tabs([
@@ -351,9 +404,42 @@ with tab_compare:
         hovermode="x unified",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         margin=dict(l=20, r=20, t=40, b=20),
-        height=500,
+        height=450,
     )
     st.plotly_chart(fig_compare, use_container_width=True)
+
+    if enable_burn:
+        st.markdown("---")
+        st.subheader("Annual Inflows (Contributions) vs. Outflows (Cash Burn)")
+        fig_flows = go.Figure()
+        fig_flows.add_trace(
+            go.Bar(
+                x=df_proj["year"].iloc[1:],
+                y=df_proj["annual_total_contribution"].iloc[1:],
+                name="Annual Contributions (Inflow)",
+                marker_color="#10B981",
+                hovertemplate="Inflow: $%{y:,.0f}<extra></extra>",
+            )
+        )
+        fig_flows.add_trace(
+            go.Bar(
+                x=df_proj["year"].iloc[1:],
+                y=df_proj["annual_burn"].iloc[1:],
+                name="Annual Cash Burn (Outflow)",
+                marker_color="#EF4444",
+                hovertemplate="Outflow: $%{y:,.0f}<extra></extra>",
+            )
+        )
+        fig_flows.update_layout(
+            barmode="group",
+            xaxis_title="Years from Today",
+            yaxis_title="Annual Amount ($)",
+            hovermode="x unified",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            margin=dict(l=20, r=20, t=40, b=20),
+            height=350,
+        )
+        st.plotly_chart(fig_flows, use_container_width=True)
 
 with tab_allocation:
     st.subheader("Asset Allocation Breakdown: Year 0 vs. Year End")
@@ -404,7 +490,10 @@ with tab_table:
     
     # Format DataFrame for clean reading
     display_df = df_proj.copy()
-    display_cols = ["year", "total_nominal_balance", "total_real_balance", "total_contributions", "total_growth"]
+    display_cols = ["year", "total_nominal_balance", "total_real_balance"]
+    if enable_burn:
+        display_cols.extend(["annual_burn", "net_cash_flow", "cumulative_burn"])
+    display_cols.extend(["total_contributions", "total_growth"])
     for acc in st.session_state.accounts:
         display_cols.append(f"{acc.bucket}_nominal")
     
@@ -424,3 +513,4 @@ with tab_table:
         file_name=f"wealth_projection_{years}_years.csv",
         mime="text/csv",
     )
+

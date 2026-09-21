@@ -31,12 +31,32 @@ class AccountConfig:
 
 
 @dataclass
+class SpendingPhase:
+    name: str
+    start_year: int
+    end_year: int
+    annual_burn: float
+    education_from_529: float = 0.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
 class ProjectionParameters:
     years: int = 20
     inflation_rate_pct: float = 2.5
     contribution_growth_rate_pct: float = 2.0
     pre_tax_retirement_tax_rate_pct: float = 22.0  # Estimated tax rate on pre-tax withdrawals
     capital_gains_tax_rate_pct: float = 15.0      # Long-term capital gains tax rate on taxable gains
+    enable_cash_burn: bool = False
+    inflate_spending: bool = True                 # Whether cash burn inflates over time
+    spending_phases: List[SpendingPhase] = None
+
+    def __post_init__(self):
+        if self.spending_phases is None:
+            self.spending_phases = []
+
 
 
 class ProjectionEngine:
@@ -107,6 +127,9 @@ class ProjectionEngine:
             "total_growth": 0.0,
             "annual_total_contribution": 0.0,
             "annual_total_growth": 0.0,
+            "annual_burn": 0.0,
+            "cumulative_burn": 0.0,
+            "net_cash_flow": 0.0,
         }
 
         # Per bucket columns for Year 0
@@ -121,6 +144,7 @@ class ProjectionEngine:
 
         g = params.contribution_growth_rate_pct / 100.0
         inf = params.inflation_rate_pct / 100.0
+        cumulative_burn = 0.0
 
         for year in range(1, params.years + 1):
             deflator = (1.0 + inf) ** year
@@ -133,19 +157,16 @@ class ProjectionEngine:
                 "year": year,
             }
 
+            # Step 1: Growth and Contributions
             for s in account_states:
                 cfg = s["config"]
                 b_name = cfg.bucket
 
-                # Contribution this year
                 curr_contrib = cfg.annual_contribution * contribution_factor
-
-                # Growth this year
                 net_return_rate = (cfg.expected_return_pct - cfg.drag_pct) / 100.0
                 curr_growth = s["balance"] * net_return_rate
 
-                # Update running state
-                s["balance"] = s["balance"] + curr_growth + curr_contrib
+                s["balance"] = max(0.0, s["balance"] + curr_growth + curr_contrib)
                 s["cost_basis"] += curr_contrib
                 s["total_contributions"] += curr_contrib
                 s["total_growth"] = s["balance"] - cfg.current_balance - s["total_contributions"]
@@ -153,7 +174,50 @@ class ProjectionEngine:
                 annual_contributions_this_year += curr_contrib
                 annual_growth_this_year += curr_growth
 
-                # Record bucket metrics
+            # Step 2: Calculate Cash Burn / Spending for this year
+            actual_burn = 0.0
+            actual_529_draw = 0.0
+            if params.enable_cash_burn and params.spending_phases:
+                active_phases = [
+                    p for p in params.spending_phases
+                    if p.start_year <= year <= p.end_year
+                ]
+                base_burn = sum(p.annual_burn for p in active_phases)
+                base_529 = sum(p.education_from_529 for p in active_phases)
+
+                spend_multiplier = (1.0 + inf) ** (year - 1) if params.inflate_spending else 1.0
+                actual_burn = base_burn * spend_multiplier
+                actual_529_draw = base_529 * spend_multiplier
+
+            # Step 3: Execute Withdrawals (Waterfall)
+            remaining_burn = actual_burn
+
+            # 3a. Draw education portion from 529 first if specified
+            if actual_529_draw > 0:
+                for s in account_states:
+                    if s["config"].bucket == "529 Tax-Advantaged" and s["balance"] > 0:
+                        draw = min(s["balance"], actual_529_draw)
+                        s["balance"] -= draw
+                        remaining_burn = max(0.0, remaining_burn - draw)
+
+            # 3b. Waterfall for remaining burn: Taxable -> Pre-Tax -> Roth -> remaining 529
+            bucket_priority = ["Investment Accounts", "Pre-Tax Retirement", "Post-Tax Retirement", "529 Tax-Advantaged"]
+            for target_bucket in bucket_priority:
+                if remaining_burn <= 0:
+                    break
+                for s in account_states:
+                    if s["config"].bucket == target_bucket and s["balance"] > 0:
+                        draw = min(s["balance"], remaining_burn)
+                        s["balance"] -= draw
+                        remaining_burn -= draw
+
+            total_withdrawn = actual_burn - remaining_burn  # amount successfully drawn
+            cumulative_burn += total_withdrawn
+            net_cash_flow = annual_contributions_this_year - total_withdrawn
+
+            # Record per-bucket final balances
+            for s in account_states:
+                b_name = s["config"].bucket
                 year_record[f"{b_name}_nominal"] = s["balance"]
                 year_record[f"{b_name}_real"] = s["balance"] / deflator
                 year_record[f"{b_name}_contributions"] = s["total_contributions"]
@@ -170,6 +234,9 @@ class ProjectionEngine:
             year_record["total_growth"] = total_growth
             year_record["annual_total_contribution"] = annual_contributions_this_year
             year_record["annual_total_growth"] = annual_growth_this_year
+            year_record["annual_burn"] = total_withdrawn
+            year_record["cumulative_burn"] = cumulative_burn
+            year_record["net_cash_flow"] = net_cash_flow
 
             records.append(year_record)
 
