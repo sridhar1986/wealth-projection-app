@@ -218,8 +218,9 @@ with st.expander("📝 Edit Account Balances, Returns & Contributions", expanded
 st.session_state.accounts = updated_accounts
 
 # Cash Burn & Spending Phases Section
-with st.expander("🔥 Cash Burn & Spending Phases (Optional)", expanded=False):
+with st.expander("🔥 Cash Burn & Spending Phases (Optional)", expanded=True):
     st.write("Model life-stage spending (e.g., higher expenses during kids' school/college years, transitioning to lower post-school living expenses).")
+
     enable_burn = st.checkbox("Enable Cash Burn / Spending Drawdowns", value=False, help="When enabled, annual living expenses and education draws are deducted from your portfolio.")
     
     spending_phases = []
