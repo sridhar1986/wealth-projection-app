@@ -7,19 +7,20 @@ An interactive, multi-bucket financial planning dashboard built with Python, Str
 The application models 4 distinct financial buckets with their specific tax, growth, and contribution profiles:
 
 1. **Investment Accounts (Taxable Brokerage)**
-   - Pre-loaded balance: **$2,000,000**
+   - Pre-loaded balance: **$200,000**
    - High liquidity, models annual dividend/tax drag and capital gains tax on liquidation.
 2. **Pre-Tax Retirement (Traditional 401k / Traditional IRA)**
-   - Pre-loaded balance: **$1,000,000**
+   - Pre-loaded balance: **$100,000**
    - Tax-deferred compounding, taxed as ordinary income upon retirement withdrawal.
 3. **Post-Tax Retirement (Roth IRA / Roth 401k)**
-   - Pre-loaded balance: **$100,000**
+   - Pre-loaded balance: **$10,000**
    - Tax-free compounding and 100% tax-free qualified withdrawals.
 4. **529 Tax-Advantaged (Education Savings)**
-   - Pre-loaded balance: **$20,000**
+   - Pre-loaded balance: **$2,000**
    - Tax-free compounding for qualified educational expenses.
 
-**Total Starting Portfolio**: **$3,120,000**
+**Total Starting Portfolio**: **$312,000**
+
 
 ---
 
@@ -62,9 +63,10 @@ If you create your own CSV file, use this format:
 
 ```csv
 bucket,account_name,current_balance,annual_contribution,expected_return_pct,drag_pct
-Investment Accounts,Taxable Brokerage,2000000,20000,7.5,0.2
-Pre-Tax Retirement,Traditional 401(k) / IRA,1000000,23000,7.0,0.1
-Post-Tax Retirement,Roth IRA / Roth 401(k),100000,7000,8.0,0.05
-529 Tax-Advantaged,College 529 Plan,20000,6000,6.0,0.1
+Investment Accounts,Taxable Brokerage,200000,6000,7.5,0.2
+Pre-Tax Retirement,Traditional 401(k) / IRA,100000,10000,7.0,0.1
+Post-Tax Retirement,Roth IRA / Roth 401(k),10000,3500,8.0,0.05
+529 Tax-Advantaged,College 529 Plan,2000,1200,6.0,0.1
 ```
+
 # wealth-projector

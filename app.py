@@ -87,36 +87,37 @@ DEFAULT_ACCOUNTS = [
     AccountConfig(
         bucket="Investment Accounts",
         account_name="Taxable Brokerage",
-        current_balance=2000000.0,
-        annual_contribution=20000.0,
+        current_balance=200000.0,
+        annual_contribution=6000.0,
         expected_return_pct=7.5,
         drag_pct=0.2,
     ),
     AccountConfig(
         bucket="Pre-Tax Retirement",
         account_name="Traditional 401(k) / IRA",
-        current_balance=1000000.0,
-        annual_contribution=23000.0,
+        current_balance=100000.0,
+        annual_contribution=10000.0,
         expected_return_pct=7.0,
         drag_pct=0.1,
     ),
     AccountConfig(
         bucket="Post-Tax Retirement",
         account_name="Roth IRA / Roth 401(k)",
-        current_balance=100000.0,
-        annual_contribution=7000.0,
+        current_balance=10000.0,
+        annual_contribution=3500.0,
         expected_return_pct=8.0,
         drag_pct=0.05,
     ),
     AccountConfig(
         bucket="529 Tax-Advantaged",
         account_name="529 Education Savings",
-        current_balance=20000.0,
-        annual_contribution=6000.0,
+        current_balance=2000.0,
+        annual_contribution=1200.0,
         expected_return_pct=6.0,
         drag_pct=0.1,
     ),
 ]
+
 
 COLOR_MAP = {
     "Investment Accounts": "#6366F1",      # Indigo
@@ -169,7 +170,7 @@ if uploaded_file is not None:
     except Exception as e:
         st.sidebar.error(f"Error reading CSV: {e}")
 
-if st.sidebar.button("🔄 Reset to Default Portfolio ($3.12M)", use_container_width=True):
+if st.sidebar.button("🔄 Reset to Default Portfolio ($312K)", use_container_width=True):
     st.session_state.accounts = [AccountConfig(**a.to_dict()) for a in DEFAULT_ACCOUNTS]
     st.rerun()
 
@@ -197,8 +198,8 @@ with st.expander("📝 Edit Account Balances, Returns & Contributions", expanded
         with col:
             st.markdown(f"**{acc.bucket}**")
             account_name = st.text_input(f"Name #{idx+1}", value=acc.account_name, key=f"name_{idx}")
-            balance = st.number_input(f"Current Balance ($)", value=float(acc.current_balance), step=10000.0, format="%.0f", key=f"bal_{idx}")
-            contrib = st.number_input(f"Annual Contribution ($)", value=float(acc.annual_contribution), step=1000.0, format="%.0f", key=f"contrib_{idx}")
+            balance = st.number_input(f"Current Balance ($)", value=float(acc.current_balance), step=5000.0, format="%.0f", key=f"bal_{idx}")
+            contrib = st.number_input(f"Annual Contribution ($)", value=float(acc.annual_contribution), step=500.0, format="%.0f", key=f"contrib_{idx}")
             ret_pct = st.number_input(f"Expected Return (%)", value=float(acc.expected_return_pct), step=0.25, format="%.2f", key=f"ret_{idx}")
             drag_pct = st.number_input(f"Tax/Fee Drag (%)", value=float(acc.drag_pct), step=0.05, format="%.2f", key=f"drag_{idx}",
                                        help="Expense ratio or annual dividend drag.")
@@ -234,8 +235,8 @@ with st.expander("🔥 Cash Burn & Spending Phases (Optional)", expanded=False):
             default_p1_end = min(15, years)
             p1_end = st.slider("Phase 1 Duration (Years)", min_value=1, max_value=max(1, years), value=default_p1_end, key="p1_dur",
                                help="How many years Phase 1 lasts (e.g. until kids finish school/college).")
-            p1_burn = st.number_input("Phase 1 Total Annual Spending ($)", min_value=0.0, value=120000.0, step=5000.0, format="%.0f", key="p1_burn")
-            p1_529 = st.number_input("Portion Drawn from 529 for Education ($)", min_value=0.0, value=15000.0, step=2500.0, format="%.0f", key="p1_529",
+            p1_burn = st.number_input("Phase 1 Total Annual Spending ($)", min_value=0.0, value=30000.0, step=2500.0, format="%.0f", key="p1_burn")
+            p1_529 = st.number_input("Portion Drawn from 529 for Education ($)", min_value=0.0, value=2000.0, step=500.0, format="%.0f", key="p1_529",
                                      help="Amount drawn specifically from the 529 bucket for tuition.")
             spending_phases.append(SpendingPhase(name="Phase 1 (School/Family)", start_year=1, end_year=p1_end, annual_burn=p1_burn, education_from_529=p1_529))
 
@@ -244,10 +245,11 @@ with st.expander("🔥 Cash Burn & Spending Phases (Optional)", expanded=False):
             p2_start = p1_end + 1
             if p2_start <= years:
                 st.info(f"Phase 2 covers Years **{p2_start} to {years}**.")
-                p2_burn = st.number_input("Phase 2 Annual Spending ($)", min_value=0.0, value=80000.0, step=5000.0, format="%.0f", key="p2_burn")
+                p2_burn = st.number_input("Phase 2 Annual Spending ($)", min_value=0.0, value=20000.0, step=2500.0, format="%.0f", key="p2_burn")
                 spending_phases.append(SpendingPhase(name="Phase 2 (Post-School)", start_year=p2_start, end_year=years, annual_burn=p2_burn, education_from_529=0.0))
             else:
                 st.info("Phase 1 spans the entire projection horizon.")
+
 
 # Run Projections
 params = ProjectionParameters(

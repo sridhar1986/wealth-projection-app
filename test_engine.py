@@ -55,13 +55,14 @@ class TestProjectionEngine(unittest.TestCase):
         self.assertEqual(len(accounts), 4)
 
         total_start = sum(a.current_balance for a in accounts)
-        self.assertEqual(total_start, 3120000.0)
+        self.assertEqual(total_start, 312000.0)
 
         params = ProjectionParameters(years=10)
         df = ProjectionEngine.run_projection(accounts, params)
         self.assertEqual(len(df), 11)  # Year 0 to 10
-        self.assertEqual(df.loc[0, "total_nominal_balance"], 3120000.0)
-        self.assertGreater(df.loc[10, "total_nominal_balance"], 3120000.0)
+        self.assertEqual(df.loc[0, "total_nominal_balance"], 312000.0)
+        self.assertGreater(df.loc[10, "total_nominal_balance"], 312000.0)
+
 
     def test_tax_adjusted_balances(self):
         accounts = [
