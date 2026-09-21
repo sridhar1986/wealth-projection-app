@@ -6,12 +6,52 @@ import io
 
 from engine import AccountConfig, ProjectionParameters, ProjectionEngine, STANDARD_BUCKETS
 
+import hmac
+
 st.set_page_config(
     page_title="4-Bucket Wealth & Retirement Projector",
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+def check_password() -> bool:
+    """Returns True if the user entered the correct password."""
+    secret_password = st.secrets.get("password", None)
+    if not secret_password:
+        return True
+
+    def password_entered():
+        if hmac.compare_digest(st.session_state["password_input"], str(secret_password)):
+            st.session_state["password_correct"] = True
+            if "password_input" in st.session_state:
+                del st.session_state["password_input"]
+        else:
+            st.session_state["password_correct"] = False
+
+    if st.session_state.get("password_correct", False):
+        return True
+
+    col1, col2, col3 = st.columns([1, 1.5, 1])
+    with col2:
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        st.subheader("🔒 Wealth Planner Login")
+        st.caption("Enter your password to unlock the portfolio projections.")
+        st.text_input(
+            "Password",
+            type="password",
+            key="password_input",
+            on_change=password_entered,
+            placeholder="Enter password and press Enter...",
+        )
+        if "password_correct" in st.session_state and not st.session_state["password_correct"]:
+            st.error("❌ Incorrect password. Please try again.")
+
+    return False
+
+if not check_password():
+    st.stop()
+
 
 # Custom Styling for polished dashboard look
 st.markdown(
@@ -132,6 +172,13 @@ if uploaded_file is not None:
 if st.sidebar.button("🔄 Reset to Default Portfolio ($3.12M)", use_container_width=True):
     st.session_state.accounts = [AccountConfig(**a.to_dict()) for a in DEFAULT_ACCOUNTS]
     st.rerun()
+
+if st.secrets.get("password", None) and st.session_state.get("password_correct", False):
+    st.sidebar.markdown("---")
+    if st.sidebar.button("🔒 Log Out", use_container_width=True):
+        st.session_state["password_correct"] = False
+        st.rerun()
+
 
 
 # Main Page Header
