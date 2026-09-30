@@ -184,6 +184,16 @@ st.sidebar.caption(f"Total: **${preset_total:,.0f}** · "
 
 if st.sidebar.button("⬇️ Load Selected Preset", use_container_width=True, type="primary"):
     st.session_state.accounts = [AccountConfig(**a.to_dict()) for a in preset_accounts]
+    # Clear cached widget values so the number_inputs display the new preset values
+    widget_prefixes = ["name_", "bal_", "contrib_", "ret_", "drag_"]
+    keys_to_delete = [
+        f"{prefix}{idx}"
+        for prefix in widget_prefixes
+        for idx in range(len(preset_accounts))
+    ]
+    for k in keys_to_delete:
+        if k in st.session_state:
+            del st.session_state[k]
     st.rerun()
 
 
