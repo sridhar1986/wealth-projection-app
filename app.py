@@ -82,41 +82,37 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Default accounts setup pre-loaded with user's numbers
-DEFAULT_ACCOUNTS = [
-    AccountConfig(
-        bucket="Investment Accounts",
-        account_name="Taxable Brokerage",
-        current_balance=200000.0,
-        annual_contribution=6000.0,
-        expected_return_pct=7.5,
-        drag_pct=0.2,
-    ),
-    AccountConfig(
-        bucket="Pre-Tax Retirement",
-        account_name="Traditional 401(k) / IRA",
-        current_balance=100000.0,
-        annual_contribution=10000.0,
-        expected_return_pct=7.0,
-        drag_pct=0.1,
-    ),
-    AccountConfig(
-        bucket="Post-Tax Retirement",
-        account_name="Roth IRA / Roth 401(k)",
-        current_balance=10000.0,
-        annual_contribution=3500.0,
-        expected_return_pct=8.0,
-        drag_pct=0.05,
-    ),
-    AccountConfig(
-        bucket="529 Tax-Advantaged",
-        account_name="529 Education Savings",
-        current_balance=2000.0,
-        annual_contribution=1200.0,
-        expected_return_pct=6.0,
-        drag_pct=0.1,
-    ),
-]
+# Portfolio Presets
+PORTFOLIO_PRESETS = {
+    "🟢 Starter ($312K)": [
+        AccountConfig(bucket="Investment Accounts",   account_name="Taxable Brokerage",       current_balance=200000.0,   annual_contribution=6000.0,   expected_return_pct=7.5, drag_pct=0.2),
+        AccountConfig(bucket="Pre-Tax Retirement",   account_name="Traditional 401(k) / IRA", current_balance=100000.0,   annual_contribution=10000.0,  expected_return_pct=7.0, drag_pct=0.1),
+        AccountConfig(bucket="Post-Tax Retirement",  account_name="Roth IRA / Roth 401(k)",  current_balance=10000.0,    annual_contribution=3500.0,   expected_return_pct=8.0, drag_pct=0.05),
+        AccountConfig(bucket="529 Tax-Advantaged",   account_name="529 Education Savings",   current_balance=2000.0,     annual_contribution=1200.0,   expected_return_pct=6.0, drag_pct=0.1),
+    ],
+    "🔵 Growing ($2.12M)": [
+        AccountConfig(bucket="Investment Accounts",   account_name="Taxable Brokerage",       current_balance=1000000.0,  annual_contribution=20000.0,  expected_return_pct=7.5, drag_pct=0.2),
+        AccountConfig(bucket="Pre-Tax Retirement",   account_name="Traditional 401(k) / IRA", current_balance=1000000.0,  annual_contribution=23000.0,  expected_return_pct=7.0, drag_pct=0.1),
+        AccountConfig(bucket="Post-Tax Retirement",  account_name="Roth IRA / Roth 401(k)",  current_balance=100000.0,   annual_contribution=7000.0,   expected_return_pct=8.0, drag_pct=0.05),
+        AccountConfig(bucket="529 Tax-Advantaged",   account_name="529 Education Savings",   current_balance=20000.0,    annual_contribution=5000.0,   expected_return_pct=6.0, drag_pct=0.1),
+    ],
+    "🟡 Established ($6.65M)": [
+        AccountConfig(bucket="Investment Accounts",   account_name="Taxable Brokerage",       current_balance=5000000.0,  annual_contribution=30000.0,  expected_return_pct=7.5, drag_pct=0.2),
+        AccountConfig(bucket="Pre-Tax Retirement",   account_name="Traditional 401(k) / IRA", current_balance=1500000.0,  annual_contribution=23000.0,  expected_return_pct=7.0, drag_pct=0.1),
+        AccountConfig(bucket="Post-Tax Retirement",  account_name="Roth IRA / Roth 401(k)",  current_balance=120000.0,   annual_contribution=7000.0,   expected_return_pct=8.0, drag_pct=0.05),
+        AccountConfig(bucket="529 Tax-Advantaged",   account_name="529 Education Savings",   current_balance=25000.0,    annual_contribution=6000.0,   expected_return_pct=6.0, drag_pct=0.1),
+    ],
+    "🔴 High Net Worth ($16.2M)": [
+        AccountConfig(bucket="Investment Accounts",   account_name="Taxable Brokerage",       current_balance=10000000.0, annual_contribution=50000.0,  expected_return_pct=7.5, drag_pct=0.2),
+        AccountConfig(bucket="Pre-Tax Retirement",   account_name="Traditional 401(k) / IRA", current_balance=5000000.0,  annual_contribution=23000.0,  expected_return_pct=7.0, drag_pct=0.1),
+        AccountConfig(bucket="Post-Tax Retirement",  account_name="Roth IRA / Roth 401(k)",  current_balance=1000000.0,  annual_contribution=7000.0,   expected_return_pct=8.0, drag_pct=0.05),
+        AccountConfig(bucket="529 Tax-Advantaged",   account_name="529 Education Savings",   current_balance=200000.0,   annual_contribution=10000.0,  expected_return_pct=6.0, drag_pct=0.1),
+    ],
+}
+
+# Keep backward-compatible alias
+DEFAULT_ACCOUNTS = PORTFOLIO_PRESETS["🟢 Starter ($312K)"]
+
 
 
 COLOR_MAP = {
@@ -170,9 +166,26 @@ if uploaded_file is not None:
     except Exception as e:
         st.sidebar.error(f"Error reading CSV: {e}")
 
-if st.sidebar.button("🔄 Reset to Default Portfolio ($312K)", use_container_width=True):
-    st.session_state.accounts = [AccountConfig(**a.to_dict()) for a in DEFAULT_ACCOUNTS]
+st.sidebar.markdown("---")
+st.sidebar.subheader("🎯 Portfolio Presets")
+selected_preset = st.sidebar.selectbox(
+    "Load a preset portfolio:",
+    options=list(PORTFOLIO_PRESETS.keys()),
+    help="Choose a starting portfolio tier, then click Load to apply it.",
+    key="preset_selector",
+)
+
+# Show summary of selected preset
+preset_accounts = PORTFOLIO_PRESETS[selected_preset]
+preset_total = sum(a.current_balance for a in preset_accounts)
+st.sidebar.caption(f"Total: **${preset_total:,.0f}** · "
+                   f"Inv: ${next(a.current_balance for a in preset_accounts if a.bucket == 'Investment Accounts'):,.0f} · "
+                   f"Pre-Tax: ${next(a.current_balance for a in preset_accounts if a.bucket == 'Pre-Tax Retirement'):,.0f}")
+
+if st.sidebar.button("⬇️ Load Selected Preset", use_container_width=True, type="primary"):
+    st.session_state.accounts = [AccountConfig(**a.to_dict()) for a in preset_accounts]
     st.rerun()
+
 
 if st.secrets.get("password", None) and st.session_state.get("password_correct", False):
     st.sidebar.markdown("---")
