@@ -183,17 +183,16 @@ st.sidebar.caption(f"Total: **${preset_total:,.0f}** · "
                    f"Pre-Tax: ${next(a.current_balance for a in preset_accounts if a.bucket == 'Pre-Tax Retirement'):,.0f}")
 
 if st.sidebar.button("⬇️ Load Selected Preset", use_container_width=True, type="primary"):
-    st.session_state.accounts = [AccountConfig(**a.to_dict()) for a in preset_accounts]
-    # Clear cached widget values so the number_inputs display the new preset values
-    widget_prefixes = ["name_", "bal_", "contrib_", "ret_", "drag_"]
-    keys_to_delete = [
-        f"{prefix}{idx}"
-        for prefix in widget_prefixes
-        for idx in range(len(preset_accounts))
-    ]
-    for k in keys_to_delete:
-        if k in st.session_state:
-            del st.session_state[k]
+    new_accounts = [AccountConfig(**a.to_dict()) for a in preset_accounts]
+    # Write preset values directly into each widget's session state key
+    # so Streamlit reads the new values when rendering the number_inputs
+    for idx, acc in enumerate(new_accounts):
+        st.session_state[f"name_{idx}"]   = acc.account_name
+        st.session_state[f"bal_{idx}"]    = float(acc.current_balance)
+        st.session_state[f"contrib_{idx}"] = float(acc.annual_contribution)
+        st.session_state[f"ret_{idx}"]    = float(acc.expected_return_pct)
+        st.session_state[f"drag_{idx}"]   = float(acc.drag_pct)
+    st.session_state.accounts = new_accounts
     st.rerun()
 
 
